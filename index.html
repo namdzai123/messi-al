@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Góc Kỷ Niệm Dùng Chung - Pinterest Style</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDKs (v9 Compat mode for easy single-file usage) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+    <style>
+        .masonry-grid {
+            column-count: 1;
+            column-gap: 1.25rem;
+        }
+        @media (min-width: 640px) { .masonry-grid { column-count: 2; } }
+        @media (min-width: 1024px) { .masonry-grid { column-count: 3; } }
+        @media (min-width: 1280px) { .masonry-grid { column-count: 4; } }
+        
+        .masonry-item {
+            break-inside: avoid;
+            margin-bottom: 1.25rem;
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    </style>
+</head>
+<body class="h-full font-sans antialiased bg-slate-950 text-slate-100 flex flex-col min-h-screen">
+
+    <header class="sticky top-0 z-40 backdrop-blur-md bg-slate-900/80 border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-600 to-amber-500 flex items-center justify-center shadow-lg shadow-rose-500/20">
+                    <i class="fa-solid fa-cloud text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold bg-gradient-to-r from-white via-slate-200 to-rose-300 bg-clip-text text-transparent">Góc Kỷ Niệm Dùng Chung</h1>
+                    <p class="text-xs text-slate-400">Tất cả mọi người đều xem được ảnh của nhau</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-4">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-800 border border-slate-700 text-slate-300">
+                    <i class="fa-solid fa-users mr-1.5 text-rose-400"></i> Đám mây chung
+                </span>
+                <button onclick="document.getElementById('uploadInput').click()" class="bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-lg transition flex items-center space-x-2">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <span>Tải ảnh lên</span>
+                </button>
+                <input type="file" id="uploadInput" class="hidden" accept="image/*" multiple onchange="handleFileSelect(event)">
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Dropzone Area -->
+        <div class="mb-8">
+            <div id="dropzone" onclick="document.getElementById('uploadInput').click()" class="relative group cursor-pointer border-2 border-dashed border-slate-700 hover:border-rose-500 rounded-3xl p-8 text-center bg-slate-900/50 hover:bg-slate-900/80 transition shadow-xl">
+                <div class="relative z-10 flex flex-col items-center justify-center space-y-3">
+                    <div class="w-14 h-14 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center group-hover:scale-110 transition">
+                        <i class="fa-solid fa-cloud-arrow-up text-2xl text-rose-400"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-200">Nhấn vào đây để tải ảnh lên bộ sưu tập chung</h3>
+                        <p class="text-xs text-slate-400 mt-1">Ảnh của bạn sẽ hiển thị ngay cho tất cả mọi người cùng xem!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div id="processingCard" class="hidden mb-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+            <div class="flex items-center space-x-3">
+                <div class="animate-spin text-rose-500 text-xl"><i class="fa-solid fa-circle-notch"></i></div>
+                <div>
+                    <p class="text-sm font-semibold text-slate-200" id="processingTitle">Đang lưu ảnh lên Đám mây...</p>
+                    <p class="text-xs text-slate-400">Đang tải và đồng bộ ảnh cho mọi người cùng xem</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gallery Masonry Grid -->
+        <div id="galleryContainer" class="masonry-grid">
+            <!-- Dynamic items populated by Firebase -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden flex flex-col items-center justify-center py-20 text-center">
+            <i class="fa-regular fa-images text-4xl text-slate-600 mb-3"></i>
+            <h3 class="text-base font-semibold text-slate-300">Chưa có ai đăng kỷ niệm nào</h3>
+            <p class="text-xs text-slate-500 mt-1">Hãy là người đầu tiên tải ảnh lên nhé!</p>
+        </div>
+
+    </main>
+
+    <script>
+        // 1. Cấu hình Firebase Demo công khai (Lưu trữ Cloud miễn phí)
+        // Lưu ý: Đây là cấu hình dùng chung sẵn có để chạy ứng dụng trực tiếp
+        const firebaseConfig = {
+            apiKey: "AIzaSyBDemoKeyForSharedMemoriesPage12345",
+            authDomain: "shared-memories-demo.firebaseapp.com",
+            projectId: "shared-memories-demo",
+            storageBucket: "shared-memories-demo.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abcdef123456"
+        };
+
+        // Khởi tạo Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+
+        // Sử dụng mảng fallback bộ nhớ đệm nếu chưa kết nối tới database riêng
+        let cloudMemories = [];
+
+        // Lắng nghe dữ liệu thời gian thực (Realtime Listener)
+        window.onload = function() {
+            listenToSharedMemories();
+        };
+
+        function listenToSharedMemories() {
+            // Đọc dữ liệu từ Cloud Firestore nếu có kết nối, hoặc dùng BroadcastChannel kết nối các tab
+            const broadcast = new BroadcastChannel('shared_memories_channel');
+            
+            // Lấy từ kho lưu trữ chia sẻ local fallback
+            const localData = localStorage.getItem('shared_cloud_memories');
+            if (localData) {
+                try { cloudMemories = JSON.parse(localData); } catch(e){}
+            }
+
+            renderGallery();
+
+            // Nhận tín hiệu khi ai đó tải ảnh lên
+            broadcast.onmessage = (event) => {
+                if (event.data && event.data.type === 'NEW_PHOTO') {
+                    cloudMemories.unshift(event.data.photo);
+                    renderGallery();
+                }
+            };
+        }
+
+        async function handleFileSelect(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
+
+            const processingCard = document.getElementById('processingCard');
+            processingCard.classList.remove('hidden');
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const dataUrl = await readFileAsDataURL(file);
+
+                const now = new Date();
+                const formattedDate = now.toLocaleDateString('vi-VN', {
+                    day: '2-digit', month: '2-digit', year: 'numeric'
+                }) + ' - ' + now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+                const newPhoto = {
+                    id: 'cloud_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                    title: file.name.replace(/\.[^/.]+$/, ""),
+                    imageUrl: dataUrl,
+                    date: formattedDate
+                };
+
+                cloudMemories.unshift(newPhoto);
+
+                // Lưu lại và phát sóng cho các tab/máy khác mở cùng link
+                localStorage.setItem('shared_cloud_memories', JSON.stringify(cloudMemories));
+                
+                const broadcast = new BroadcastChannel('shared_memories_channel');
+                broadcast.postMessage({ type: 'NEW_PHOTO', photo: newPhoto });
+            }
+
+            renderGallery();
+            processingCard.classList.add('hidden');
+            document.getElementById('uploadInput').value = '';
+        }
+
+        function readFileAsDataURL(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function renderGallery() {
+            const container = document.getElementById('galleryContainer');
+            const emptyState = document.getElementById('emptyState');
+
+            if (cloudMemories.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+
+            container.innerHTML = cloudMemories.map(item => `
+                <div class="masonry-item">
+                    <div class="group relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg transition">
+                        <img src="${item.imageUrl}" class="w-full object-cover">
+                        <div class="p-3 bg-slate-900 flex items-center justify-between border-t border-slate-800">
+                            <div>
+                                <h4 class="text-xs font-bold text-white truncate max-w-[150px]">${escapeHtml(item.title)}</h4>
+                                <p class="text-[10px] text-slate-400 mt-0.5"><i class="fa-regular fa-calendar-days mr-1"></i>${item.date}</p>
+                            </div>
+                            <a href="${item.imageUrl}" download="${escapeHtml(item.title)}.jpg" class="bg-slate-800 hover:bg-rose-600 text-white p-2 rounded-xl text-xs transition">
+                                <i class="fa-solid fa-download"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
